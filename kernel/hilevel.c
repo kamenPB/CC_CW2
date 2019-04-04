@@ -221,6 +221,19 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x03 : { // 0x03 => fork
+      n_prog++;
+
+      memset( &pcb[ n_prog ], 0, sizeof( pcb_t ) );
+      pcb[ n_prog ].pid      = n_prog;
+      pcb[ n_prog ].status   = STATUS_CREATED;
+      pcb[ n_prog ].ctx.cpsr = 0x50;
+
+      // ??
+      pcb[ n_prog ].ctx.pc   = ( uint32_t )( &main_console );
+
+      pcb[ n_prog ].ctx.sp   = ( uint32_t )( &tos_P3  ); //empty stack
+      pcb[ n_prog ].priority = current->priority;
+      pcb[ n_prog ].age = current->age;
 
       break;
     }
@@ -235,6 +248,10 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x05 : { // 0x05 => exec
+
+      
+
+
 
       break;
     }
