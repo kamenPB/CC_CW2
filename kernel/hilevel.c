@@ -19,6 +19,7 @@ pid_t pid = 1;
 
 bool isFull_PCB(){
   for (int i=0; i<maxPrograms; i++){
+    // id is only 0 if space is unused
     if (pcb[i].pid == 0)
     return false;
   }
@@ -270,6 +271,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
         n_prog++;
         break;
+
       } else {
         ctx->gpr[0] = -1;
       }
@@ -287,6 +289,7 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
       int id = getCurrentIndex();
 
+      // update statuses
       current->status = STATUS_READY;
       pcb[id].status = STATUS_EXECUTING;
 
