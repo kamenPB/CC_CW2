@@ -7,6 +7,7 @@
 
 
 #include "hilevel.h"
+#include <stdbool.h>
 
 #define maxPrograms 20
 #define priorityWeight 3
@@ -14,6 +15,15 @@
 
 pcb_t pcb[ maxPrograms ]; pcb_t* current = NULL;
 int n_prog = 0;
+pid_t pid = 1;
+
+bool isFull_PCB(){
+  for (int i=0; i<maxPrograms; i++){
+    if (pcb[i].pid == 0)
+    return false;
+  }
+  return true;
+}
 
 void dispatch( ctx_t* ctx, pcb_t* prev, pcb_t* next) {
   char prev_pid = '?', next_pid = '?';
@@ -48,10 +58,6 @@ void schedule( ctx_t* ctx, bool terminated) {
     if(pcb[i].status == STATUS_EXECUTING){
       r_priority = pcb[i].priority * priorityWeight + pcb[i].age;
       current_id = i;
-       char h = '0' + r_priority;
-       PL011_putc( UART0, h, true );
-       // char h = '0' + current_id;
-       // PL011_putc( UART0, h, true );
     }
   }
 
@@ -70,10 +76,6 @@ void schedule( ctx_t* ctx, bool terminated) {
         }
       }
   }
-  // char h = '0' + next_id;
-  // PL011_putc( UART0, h, true );
-   char h = '0' + max_priority;
-   PL011_putc( UART0, h, true );
 
    if(terminated){
      // set status
@@ -105,7 +107,6 @@ void schedule( ctx_t* ctx, bool terminated) {
       && pcb[i].pid != 0){
         pcb[i].age ++;
       }
-
   return;
 }
 
@@ -148,14 +149,6 @@ int getCurrentIndex(){
   return id;
 }
 
-bool isFull_PCB(){
-  for (int i=0; i<maxPrograms; i++){
-    if (pcb[i].pid == 0)
-    return false;
-  }
-  return true;
-}
-
 void hilevel_handler_rst( ctx_t* ctx              ) {
 
   TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
@@ -171,7 +164,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
 
 
   memset( &pcb[ 0 ], 0, sizeof( pcb_t ) );     // initialise 0-th PCB = Console
-  pcb[ 0 ].pid      = 1; // id 1 is console
+  pcb[ 0 ].pid      = pid; // id 1 is console
   pcb[ 0 ].status   = STATUS_CREATED;
   pcb[ 0 ].ctx.cpsr = 0x50;
   pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
@@ -248,34 +241,38 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x03 : { // 0x03 => fork
+      if (!isFull_PCB()){
 
-      memset( &pcb[ n_prog ], 0, sizeof( pcb_t ) );
+        memset( &pcb[ n_prog ], 0, sizeof( pcb_t ) );
 
-      memcpy( &pcb[ n_prog].ctx, ctx, sizeof(ctx_t));
+        memcpy( &pcb[ n_prog].ctx, ctx, sizeof(ctx_t));
 
-      //copy stack of parent to child
-      int id = getCurrentIndex();
-      memcpy( (void *) stacks[n_prog] - 0x00001000, (void *) stacks[id] - 0x00001000, 0x00001000);
-      //child stack //parent stack, sizeof(stack));
+        //copy stack of parent to child
+        int id = getCurrentIndex();
+        memcpy( (void *) stacks[n_prog] - 0x00001000, (void *) stacks[id] - 0x00001000, 0x00001000);
+        //child stack //parent stack, sizeof(stack));
 
+        pid++;
 
-      pcb[ n_prog ].pid      = n_prog + 1;
-      pcb[ n_prog ].status   = STATUS_CREATED;
-      pcb[ n_prog ].ctx.cpsr = 0x50; //just in case.
+        pcb[ n_prog ].pid      = pid;
+        pcb[ n_prog ].status   = STATUS_CREATED;
+        pcb[ n_prog ].ctx.cpsr = 0x50; //just in case.
 
-      //set stack pointer of child program same distance as parent sp.
-      pcb[ n_prog ].ctx.sp = (uint32_t) stacks[n_prog] - (stacks[id] - ctx->sp);
+        //set stack pointer of child program same distance as parent sp.
+        pcb[ n_prog ].ctx.sp = (uint32_t) stacks[n_prog] - (stacks[id] - ctx->sp);
 
-      //pcb[ n_prog ].ctx.sp   = ( uint32_t ) stacks[n_prog]; //empty stack
-      pcb[ n_prog ].priority = current->priority;
-      pcb[ n_prog ].age = current->age;
-      pcb[ n_prog ].ctx.gpr[0] = 0; //return 0 for child.
-      // ??
-      //pcb[ n_prog ].ctx.pc   = ctx->pc;
-      ctx->gpr[0] = n_prog + 1; //return pid of child to parent.
+        //pcb[ n_prog ].ctx.sp   = ( uint32_t ) stacks[n_prog]; //empty stack
+        pcb[ n_prog ].priority = current->priority;
+        pcb[ n_prog ].age = current->age;
+        pcb[ n_prog ].ctx.gpr[0] = 0; //return 0 for child.
 
-      n_prog++;
-      break;
+        ctx->gpr[0] = pid; //return pid of child to parent.
+
+        n_prog++;
+        break;
+      } else {
+        ctx->gpr[0] = -1;
+      }
     }
 
     case 0x04 : { // 0x04 => exit
@@ -314,8 +311,8 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
             pcb[i].status = STATUS_TERMINATED;
           }
           ctx->gpr[0] = 0; //return value of kill.
-          return;
 
+          return;
         }
       }
 
