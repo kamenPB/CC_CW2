@@ -22,6 +22,7 @@ void main_P3() {
     write( STDOUT_FILENO, "P3", 2 );
 
     //exit(EXIT_SUCCESS);
+    kill (1, 10);
 
     uint32_t lo = 1 <<  8;
     uint32_t hi = 1 << 24;

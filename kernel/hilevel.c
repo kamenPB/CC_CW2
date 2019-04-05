@@ -139,6 +139,16 @@ uint32_t stacks[maxPrograms] = {};
 
 extern void     main_console();
 
+int getCurrentIndex(){
+  int id = -1;
+  for (int i=0; i< maxPrograms; i++){
+    if (current->pid == pcb[i].pid){
+      id = i;
+      break;
+    }
+  }
+  return id;
+}
 
 void hilevel_handler_rst( ctx_t* ctx              ) {
 
@@ -163,35 +173,6 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   pcb[ 0 ].priority = 2; // 1 = low, 9 = high
   pcb[ 0 ].age = 0;
 
-  // memset( &pcb[ 1 ], 0, sizeof( pcb_t ) );
-  // pcb[ 1 ].pid      = 3;
-  // pcb[ 1 ].status   = STATUS_CREATED;
-  // pcb[ 1 ].ctx.cpsr = 0x50;
-  // pcb[ 1 ].ctx.pc   = ( uint32_t )( &main_P3 );
-  // pcb[ 1 ].ctx.sp   = ( uint32_t )( &tos_P3  ); //empty stack
-  // pcb[ 1 ].priority = 3;
-  // pcb[ 1 ].age = 1;
-  // n_prog++;
-  //
-  // memset( &pcb[ 2 ], 0, sizeof( pcb_t ) );
-  // pcb[ 2 ].pid      = 4;
-  // pcb[ 2 ].status   = STATUS_CREATED;
-  // pcb[ 2 ].ctx.cpsr = 0x50;
-  // pcb[ 2 ].ctx.pc   = ( uint32_t )( &main_P4 );
-  // pcb[ 2 ].ctx.sp   = ( uint32_t )( &tos_P4  ); //empty stack
-  // pcb[ 2 ].priority = 3;
-  // pcb[ 2 ].age = 0;
-  // n_prog++;
-  //
-  // memset( &pcb[ 3 ], 0, sizeof( pcb_t ) );
-  // pcb[ 3 ].pid      = 5;
-  // pcb[ 3 ].status   = STATUS_CREATED;
-  // pcb[ 3 ].ctx.cpsr = 0x50;
-  // pcb[ 3 ].ctx.pc   = ( uint32_t )( &main_P5 );
-  // pcb[ 3 ].ctx.sp   = ( uint32_t )( &tos_P3  ); //empty stack
-  // pcb[ 3 ].priority = 4; // 1 = low, 2 = high
-  // pcb[ 3 ].age = 0;
-  // n_prog++;
 
   stacks[0] = ( uint32_t )( &tos_P1 );
   stacks[1] = ( uint32_t )( &tos_P2 );
@@ -265,23 +246,19 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       memset( &pcb[ n_prog ], 0, sizeof( pcb_t ) );
 
       memcpy( &pcb[ n_prog].ctx, ctx, sizeof(ctx_t));
+
+      //copy stack of parent to child
+      int id = getCurrentIndex();
+      memcpy( (void *) stacks[n_prog] - 0x00001000, (void *) stacks[id] - 0x00001000, 0x00001000);
+      //child stack //parent stack, sizeof(stack));
+
+
       pcb[ n_prog ].pid      = n_prog + 1;
       pcb[ n_prog ].status   = STATUS_CREATED;
       pcb[ n_prog ].ctx.cpsr = 0x50; //just in case.
-      //copy stack of parent to child
-      int indexofCurrent = -1;
-      for (int i=0; i< maxPrograms; i++){
-        if (current->pid == pcb[i].pid){
-          indexofCurrent = i;
-          break;
-        }
-      }
-
-      memcpy( (void *) stacks[n_prog] - 0x00001000, (void *) stacks[indexofCurrent] - 0x00001000, 0x00001000);
-      //child stack //parent stack, sizeof(stack));
 
       //set stack pointer of child program same distance as parent sp.
-      pcb[ n_prog ].ctx.sp = (uint32_t) stacks[n_prog] - (stacks[indexofCurrent] - ctx->sp);
+      pcb[ n_prog ].ctx.sp = (uint32_t) stacks[n_prog] - (stacks[id] - ctx->sp);
 
       //pcb[ n_prog ].ctx.sp   = ( uint32_t ) stacks[n_prog]; //empty stack
       pcb[ n_prog ].priority = current->priority;
@@ -289,10 +266,9 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       pcb[ n_prog ].ctx.gpr[0] = 0; //return 0 for child.
       // ??
       //pcb[ n_prog ].ctx.pc   = ctx->pc;
-      ctx->gpr[0] = n_prog; //return pid of child to parent.
+      ctx->gpr[0] = n_prog + 1; //return pid of child to parent.
 
       n_prog++;
-
       break;
     }
 
@@ -308,16 +284,36 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     case 0x05 : { // 0x05 => exec
       ctx->pc = (uint32_t) ctx->gpr[0];
 
-      int indexofCurrent = -1;
-      for (int i=0; i< maxPrograms; i++){
-        if (current->pid == pcb[i].pid){
-          indexofCurrent = i;
-          break;
+      int id = getCurrentIndex();
+
+      current->status = STATUS_READY;
+      pcb[id].status = STATUS_EXECUTING;
+
+      ctx->sp = stacks[id]; //reset stack to top.
+
+      break;
+    }
+
+    case 0x06 : { // 0x06 => kill
+
+      pid_t pid = ctx->gpr[0];
+
+      for (int i=0; i<maxPrograms; i++){
+        if (pid == pcb[i].pid){
+
+          // char h = '0' + pid;
+          // PL011_putc( UART0, h, true );
+
+          if (pcb[i].status == STATUS_EXECUTING){
+            // terminating itself
+            schedule(ctx, true);
+          } else {
+            // terminating another process
+            pcb[i].status = STATUS_TERMINATED;
+          }
         }
       }
 
-
-      ctx->sp = stacks[indexofCurrent]; //reset stack to top.
 
       break;
     }
