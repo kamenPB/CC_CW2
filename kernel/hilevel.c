@@ -8,8 +8,8 @@
 
 #include "hilevel.h"
 
-#define maxPrograms 4
-#define priorityWeight 1
+#define maxPrograms 20
+#define priorityWeight 3
 
 
 pcb_t pcb[ maxPrograms ]; pcb_t* current = NULL;
@@ -112,11 +112,30 @@ void schedule( ctx_t* ctx, bool terminated) {
 }
 
 extern void     main_P3();
-extern uint32_t tos_P3;
+extern uint32_t tos_P1;
 extern void     main_P4();
-extern uint32_t tos_P4;
+extern uint32_t tos_P2;
 extern void     main_P5();
 extern uint32_t tos_P3;
+extern uint32_t tos_P4;
+extern uint32_t tos_P5;
+extern uint32_t tos_P6;
+extern uint32_t tos_P7;
+extern uint32_t tos_P8;
+extern uint32_t tos_P9;
+extern uint32_t tos_P10;
+extern uint32_t tos_P11;
+extern uint32_t tos_P12;
+extern uint32_t tos_P13;
+extern uint32_t tos_P14;
+extern uint32_t tos_P15;
+extern uint32_t tos_P16;
+extern uint32_t tos_P17;
+extern uint32_t tos_P18;
+extern uint32_t tos_P19;
+extern uint32_t tos_P20;
+
+uint32_t stacks[maxPrograms] = {};
 
 extern void     main_console();
 
@@ -140,7 +159,7 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   pcb[ 0 ].status   = STATUS_CREATED;
   pcb[ 0 ].ctx.cpsr = 0x50;
   pcb[ 0 ].ctx.pc   = ( uint32_t )( &main_console );
-  pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_P3  ); //empty stack
+  pcb[ 0 ].ctx.sp   = ( uint32_t )( &tos_P1  ); //empty stack
   pcb[ 0 ].priority = 2; // 1 = low, 9 = high
   pcb[ 0 ].age = 0;
 
@@ -173,6 +192,27 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   // pcb[ 3 ].priority = 4; // 1 = low, 2 = high
   // pcb[ 3 ].age = 0;
   // n_prog++;
+  
+  stack[0] = ( uint32_t )( &tos_P1 );
+  stack[1] = ( uint32_t )( &tos_P2 );
+  stack[2] = ( uint32_t )( &tos_P3 );
+  stack[3] = ( uint32_t )( &tos_P4 );
+  stack[4] = ( uint32_t )( &tos_P5 );
+  stack[5] = ( uint32_t )( &tos_P6 );
+  stack[6] = ( uint32_t )( &tos_P7 );
+  stack[7] = ( uint32_t )( &tos_P8 );
+  stack[8] = ( uint32_t )( &tos_P9 );
+  stack[9] = ( uint32_t )( &tos_P10 );
+  stack[10] = ( uint32_t )( &tos_P11 );
+  stack[11] = ( uint32_t )( &tos_P12 );
+  stack[12] = ( uint32_t )( &tos_P13 );
+  stack[13] = ( uint32_t )( &tos_P14 );
+  stack[14] = ( uint32_t )( &tos_P15 );
+  stack[15] = ( uint32_t )( &tos_P16 );
+  stack[16] = ( uint32_t )( &tos_P17 );
+  stack[17] = ( uint32_t )( &tos_P18 );
+  stack[18] = ( uint32_t )( &tos_P19 );
+  stack[19] = ( uint32_t )( &tos_P120 );
 
   if (pcb[0].status == STATUS_CREATED){
     dispatch( ctx, NULL, &pcb[ 0 ]); // context switch to console
@@ -229,9 +269,8 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
       pcb[ n_prog ].ctx.cpsr = 0x50;
 
       // ??
-      pcb[ n_prog ].ctx.pc   = ( uint32_t )( &main_console );
-
-      pcb[ n_prog ].ctx.sp   = ( uint32_t )( &tos_P3  ); //empty stack
+      pcb[ n_prog ].ctx.pc   = ctx->pc;
+      pcb[ n_prog ].ctx.sp   = ( uint32_t ) stacks[n_prog]; //empty stack
       pcb[ n_prog ].priority = current->priority;
       pcb[ n_prog ].age = current->age;
 
