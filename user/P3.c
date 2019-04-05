@@ -21,7 +21,7 @@ void main_P3() {
   while( 1 ) {
     write( STDOUT_FILENO, "P3", 2 );
 
-    exit(EXIT_SUCCESS);
+    //exit(EXIT_SUCCESS);
 
     uint32_t lo = 1 <<  8;
     uint32_t hi = 1 << 24;

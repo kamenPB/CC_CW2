@@ -192,27 +192,27 @@ void hilevel_handler_rst( ctx_t* ctx              ) {
   // pcb[ 3 ].priority = 4; // 1 = low, 2 = high
   // pcb[ 3 ].age = 0;
   // n_prog++;
-  
-  stack[0] = ( uint32_t )( &tos_P1 );
-  stack[1] = ( uint32_t )( &tos_P2 );
-  stack[2] = ( uint32_t )( &tos_P3 );
-  stack[3] = ( uint32_t )( &tos_P4 );
-  stack[4] = ( uint32_t )( &tos_P5 );
-  stack[5] = ( uint32_t )( &tos_P6 );
-  stack[6] = ( uint32_t )( &tos_P7 );
-  stack[7] = ( uint32_t )( &tos_P8 );
-  stack[8] = ( uint32_t )( &tos_P9 );
-  stack[9] = ( uint32_t )( &tos_P10 );
-  stack[10] = ( uint32_t )( &tos_P11 );
-  stack[11] = ( uint32_t )( &tos_P12 );
-  stack[12] = ( uint32_t )( &tos_P13 );
-  stack[13] = ( uint32_t )( &tos_P14 );
-  stack[14] = ( uint32_t )( &tos_P15 );
-  stack[15] = ( uint32_t )( &tos_P16 );
-  stack[16] = ( uint32_t )( &tos_P17 );
-  stack[17] = ( uint32_t )( &tos_P18 );
-  stack[18] = ( uint32_t )( &tos_P19 );
-  stack[19] = ( uint32_t )( &tos_P120 );
+
+  stacks[0] = ( uint32_t )( &tos_P1 );
+  stacks[1] = ( uint32_t )( &tos_P2 );
+  stacks[2] = ( uint32_t )( &tos_P3 );
+  stacks[3] = ( uint32_t )( &tos_P4 );
+  stacks[4] = ( uint32_t )( &tos_P5 );
+  stacks[5] = ( uint32_t )( &tos_P6 );
+  stacks[6] = ( uint32_t )( &tos_P7 );
+  stacks[7] = ( uint32_t )( &tos_P8 );
+  stacks[8] = ( uint32_t )( &tos_P9 );
+  stacks[9] = ( uint32_t )( &tos_P10 );
+  stacks[10] = ( uint32_t )( &tos_P11 );
+  stacks[11] = ( uint32_t )( &tos_P12 );
+  stacks[12] = ( uint32_t )( &tos_P13 );
+  stacks[13] = ( uint32_t )( &tos_P14 );
+  stacks[14] = ( uint32_t )( &tos_P15 );
+  stacks[15] = ( uint32_t )( &tos_P16 );
+  stacks[16] = ( uint32_t )( &tos_P17 );
+  stacks[17] = ( uint32_t )( &tos_P18 );
+  stacks[18] = ( uint32_t )( &tos_P19 );
+  stacks[19] = ( uint32_t )( &tos_P20 );
 
   if (pcb[0].status == STATUS_CREATED){
     dispatch( ctx, NULL, &pcb[ 0 ]); // context switch to console
@@ -261,18 +261,37 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x03 : { // 0x03 => fork
-      n_prog++;
 
       memset( &pcb[ n_prog ], 0, sizeof( pcb_t ) );
-      pcb[ n_prog ].pid      = n_prog;
-      pcb[ n_prog ].status   = STATUS_CREATED;
-      pcb[ n_prog ].ctx.cpsr = 0x50;
 
-      // ??
-      pcb[ n_prog ].ctx.pc   = ctx->pc;
-      pcb[ n_prog ].ctx.sp   = ( uint32_t ) stacks[n_prog]; //empty stack
+      memcpy( &pcb[ n_prog].ctx, ctx, sizeof(ctx_t));
+      pcb[ n_prog ].pid      = n_prog + 1;
+      pcb[ n_prog ].status   = STATUS_CREATED;
+      pcb[ n_prog ].ctx.cpsr = 0x50; //just in case.
+      //copy stack of parent to child
+      int indexofCurrent = -1;
+      for (int i=0; i< maxPrograms; i++){
+        if (current->pid == pcb[i].pid){
+          indexofCurrent = i;
+          break;
+        }
+      }
+
+      memcpy( (void *) stacks[n_prog] - 0x00001000, (void *) stacks[indexofCurrent] - 0x00001000, 0x00001000);
+      //child stack //parent stack, sizeof(stack));
+
+      //set stack pointer of child program same distance as parent sp.
+      pcb[ n_prog ].ctx.sp = (uint32_t) stacks[n_prog] - (stacks[indexofCurrent] - ctx->sp);
+
+      //pcb[ n_prog ].ctx.sp   = ( uint32_t ) stacks[n_prog]; //empty stack
       pcb[ n_prog ].priority = current->priority;
       pcb[ n_prog ].age = current->age;
+      pcb[ n_prog ].ctx.gpr[0] = 0; //return 0 for child.
+      // ??
+      //pcb[ n_prog ].ctx.pc   = ctx->pc;
+      ctx->gpr[0] = n_prog; //return pid of child to parent.
+
+      n_prog++;
 
       break;
     }
@@ -287,10 +306,18 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x05 : { // 0x05 => exec
+      ctx->pc = (uint32_t) ctx->gpr[0];
 
-      
+      int indexofCurrent = -1;
+      for (int i=0; i< maxPrograms; i++){
+        if (current->pid == pcb[i].pid){
+          indexofCurrent = i;
+          break;
+        }
+      }
 
 
+      ctx->sp = stacks[indexofCurrent]; //reset stack to top.
 
       break;
     }
