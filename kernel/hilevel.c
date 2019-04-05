@@ -148,6 +148,14 @@ int getCurrentIndex(){
   return id;
 }
 
+bool isFull_PCB(){
+  for (int i=0; i<maxPrograms; i++){
+    if (pcb[i].pid == 0)
+    return false;
+  }
+  return true;
+}
+
 void hilevel_handler_rst( ctx_t* ctx              ) {
 
   TIMER0->Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
