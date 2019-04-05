@@ -102,9 +102,7 @@ void schedule( ctx_t* ctx, bool terminated) {
     if(pcb[i].status != STATUS_EXECUTING
       && pcb[i].status != STATUS_WAITING
       && pcb[i].status != STATUS_TERMINATED
-      && pcb[i].pid != 0
-      // console doesn't age
-      && pcb[i].pid != 1){
+      && pcb[i].pid != 0){
         pcb[i].age ++;
       }
 
@@ -273,8 +271,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x04 : { // 0x04 => exit
-      // char h = '0' + current->pid;
-      // PL011_putc( UART0, h, true );
 
       schedule(ctx, true);
 
@@ -295,7 +291,6 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
     }
 
     case 0x06 : { // 0x06 => kill
-
       pid_t pid = ctx->gpr[0];
 
       for (int i=0; i<maxPrograms; i++){
@@ -303,18 +298,20 @@ void hilevel_handler_svc( ctx_t* ctx, uint32_t id ) {
 
           // char h = '0' + pid;
           // PL011_putc( UART0, h, true );
-
           if (pcb[i].status == STATUS_EXECUTING){
             // terminating itself
             schedule(ctx, true);
           } else {
-            // terminating another process
+            // terminating another process;
             pcb[i].status = STATUS_TERMINATED;
           }
+          ctx->gpr[0] = 0; //return value of kill.
+          return;
+
         }
       }
 
-
+      ctx->gpr[0]=-1;
       break;
     }
 
